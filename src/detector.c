@@ -7,6 +7,7 @@
 #include "demo.h"
 #include "option_list.h"
 #include "blas.h"
+#include "image.h"
 
 static int coco_ids[] = {1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,23,24,25,27,28,31,32,33,34,35,36,37,38,39,40,41,42,43,44,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,67,70,72,73,74,75,76,77,78,79,80,81,82,84,85,86,87,88,89,90};
 
@@ -587,6 +588,48 @@ void validate_detector_recall(char *cfgfile, char *weightfile)
         free_image(sized);
     }
 }
+
+#ifdef OPENCV
+boxWithScore *my_detector(char *datacfg, char *cfgfile, char *weightfile, IplImage *iplImage, float thresh, float hier_thresh, int *numDet)
+{
+    list *options = read_data_cfg(datacfg);
+    char *name_list = option_find_str(options, "names", "data/names.list");
+
+    network net = parse_network_cfg(cfgfile);
+    if(weightfile){
+        load_weights(&net, weightfile);
+    }
+    set_batch_network(&net, 1);
+    srand(2222222);
+    clock_t time;
+    char buff[256];
+    char *input = buff;
+    int j;
+    float nms=.4;
+
+    image im = ipl_to_image(iplImage);
+    image sized = letterbox_image(im, net.w, net.h);
+    layer l = net.layers[net.n-1];
+
+    box *boxes = calloc(l.w*l.h*l.n, sizeof(box));
+    float **probs = calloc(l.w*l.h*l.n, sizeof(float *));
+    for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = calloc(l.classes + 1, sizeof(float *));
+
+    float *X = sized.data;
+    time=clock();
+    network_predict(net, X);
+    printf("%s: Predicted in %f seconds.\n", input, sec(clock()-time));
+    get_region_boxes(l, im.w, im.h, net.w, net.h, thresh, probs, boxes, 0, 0, hier_thresh, 1);
+    if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
+    boxWithScore* bbs = format_detections(im, l.w*l.h*l.n, thresh, boxes, probs, l.classes, numDet);
+
+    free_image(im);
+    free_image(sized);
+    free(boxes);
+    free_ptrs((void **)probs, l.w*l.h*l.n);
+    return bbs;
+}
+#endif
 
 void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen)
 {

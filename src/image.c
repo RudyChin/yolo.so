@@ -171,6 +171,48 @@ image **load_alphabet()
     return alphabets;
 }
 
+boxWithScore* format_detections(image im, int num, float thresh, box *boxes, float **probs, int classes, int *numDet)
+{
+    int i;
+    *numDet = 0;
+
+    boxWithScore *bbs = calloc(num, sizeof(boxWithScore));
+    for(i = 0; i < num; ++i){
+        int class = max_index(probs[i], classes);
+        float prob = probs[i][class];
+        if(prob > thresh){
+
+            int width = im.h * .012;
+
+            if(0){
+                width = pow(prob, 1./2.)*10+1;
+            }
+            box b = boxes[i];
+
+            int left  = (b.x-b.w/2.)*im.w;
+            int right = (b.x+b.w/2.)*im.w;
+            int top   = (b.y-b.h/2.)*im.h;
+            int bot   = (b.y+b.h/2.)*im.h;
+
+            if(left < 0) left = 0;
+            if(right > im.w-1) right = im.w-1;
+            if(top < 0) top = 0;
+            if(bot > im.h-1) bot = im.h-1;
+
+            bbs[*numDet].left = left;
+            bbs[*numDet].top = top;
+            bbs[*numDet].right = right;
+            bbs[*numDet].bottom = bot;
+            bbs[*numDet].cls = class;
+            bbs[*numDet].score = prob;
+            
+            *numDet = *numDet + 1;
+        }
+    }
+
+    return bbs;
+}
+
 void draw_detections(image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int classes)
 {
     int i;

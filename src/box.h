@@ -9,6 +9,10 @@ typedef struct{
     float dx, dy, dw, dh;
 } dbox;
 
+typedef struct{
+    float left, top, right, bottom, cls, score;
+} boxWithScore;
+
 box float_to_box(float *f, int stride);
 float box_iou(box a, box b);
 float box_rmse(box a, box b);

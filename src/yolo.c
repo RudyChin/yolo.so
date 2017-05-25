@@ -329,6 +329,46 @@ void test_yolo(char *cfgfile, char *weightfile, char *filename, float thresh)
     }
 }
 
+
+#ifdef OPENCV
+boxWithScore *py_test_yolo(const char *cfgfile, const char *weightfile, IplImage *iplImage, float thresh, int *numDet)
+{
+    network net = parse_network_cfg(cfgfile);
+    if(weightfile){
+        load_weights(&net, weightfile);
+    }
+    set_batch_network(&net, 1);
+    detection_layer l = net.layers[net.n-1];
+    srand(2222222);
+    clock_t time;
+    char buff[256];
+    char *input = buff;
+    int j;
+    float nms=.4;
+
+    image im = ipl_to_image(iplImage);
+    image sized = resize_image(im, net.w, net.h);
+
+    box *boxes = calloc(l.w*l.h*l.n, sizeof(box));
+    float **probs = calloc(l.w*l.h*l.n, sizeof(float *));
+    for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = calloc(l.classes + 1, sizeof(float *));
+
+    float *X = sized.data;
+    time=clock();
+    network_predict(net, X);
+    printf("%s: Predicted in %f seconds.\n", input, sec(clock()-time));
+    get_detection_boxes(l, 1, 1, thresh, probs, boxes, 0);
+    if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
+    boxWithScore* bbs = format_detections(im, l.w*l.h*l.n, thresh, boxes, probs, 1, numDet);
+
+    free_image(im);
+    free_image(sized);
+    free(boxes);
+    free_ptrs((void **)probs, l.w*l.h*l.n);
+    return bbs;
+}
+#endif
+
 void run_yolo(int argc, char **argv)
 {
     char *prefix = find_char_arg(argc, argv, "-prefix", 0);

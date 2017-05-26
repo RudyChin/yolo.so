@@ -8,6 +8,8 @@
 
 char *voc_names[] = {"aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"};
 
+network gNet;
+
 void train_yolo(char *cfgfile, char *weightfile)
 {
     char *train_images = "/data/voc/train.txt";
@@ -331,14 +333,19 @@ void test_yolo(char *cfgfile, char *weightfile, char *filename, float thresh)
 
 
 #ifdef OPENCV
-boxWithScore *py_test_yolo(const char *cfgfile, const char *weightfile, IplImage *iplImage, float thresh, int *numDet)
+void loadNet(const char *cfgfile, const char *weightfile)
 {
-    network net = parse_network_cfg(cfgfile);
+    gNet = parse_network_cfg(cfgfile);
     if(weightfile){
-        load_weights(&net, weightfile);
+        load_weights(&gNet, weightfile);
     }
-    set_batch_network(&net, 1);
-    detection_layer l = net.layers[net.n-1];
+    set_batch_network(&gNet, 1);
+}
+
+// Call loadNet before fist py_test_yolo !!!
+boxWithScore *py_test_yolo(IplImage *iplImage, float thresh, int *numDet)
+{
+    detection_layer l = gNet.layers[gNet.n-1];
     srand(2222222);
     clock_t time;
     char buff[256];
@@ -347,7 +354,7 @@ boxWithScore *py_test_yolo(const char *cfgfile, const char *weightfile, IplImage
     float nms=.4;
 
     image im = ipl_to_image(iplImage);
-    image sized = resize_image(im, net.w, net.h);
+    image sized = resize_image(im, gNet.w, gNet.h);
 
     box *boxes = calloc(l.w*l.h*l.n, sizeof(box));
     float **probs = calloc(l.w*l.h*l.n, sizeof(float *));
@@ -355,7 +362,7 @@ boxWithScore *py_test_yolo(const char *cfgfile, const char *weightfile, IplImage
 
     float *X = sized.data;
     time=clock();
-    network_predict(net, X);
+    network_predict(gNet, X);
     printf("%s: Predicted in %f seconds.\n", input, sec(clock()-time));
     get_detection_boxes(l, 1, 1, thresh, probs, boxes, 0);
     if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);

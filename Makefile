@@ -87,6 +87,7 @@ results:
 
 install: libyolo.so
 	cp libyolo.so /usr/local/lib
+	cp src/yolo.h /usr/local/include
 
 clean:
 	rm -rf $(OBJS) $(EXEC)
